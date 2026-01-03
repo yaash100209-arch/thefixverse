@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FixVerse | The Universal Repair Engine</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* Base Theme */
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-purple: #bc13fe;
+            --bg-dark: #050505;
+            --glass: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background-color: var(--bg-dark);
+            color: white;
+            overflow: hidden; /* App-like feel */
+        }
+
+        /* Glassmorphism Classes */
+        .glass-panel {
+            background: var(--glass);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-nav {
+            background: rgba(5, 5, 5, 0.8);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Animations */
+        .fade-in { animation: fadeIn 0.6s ease-out forwards; }
+        .slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Hide Scrollbar but allow scrolling */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* 3D Canvas Container */
+        #canvas-container {
+            width: 100%;
+            height: 300px;
+            background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Voice Wave Animation */
+        .voice-wave {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            height: 40px;
+        }
+        .bar {
+            width: 4px;
+            background: var(--neon-blue);
+            animation: wave 1s infinite ease-in-out;
+            border-radius: 4px;
+        }
+        .bar:nth-child(2) { animation-delay: 0.1s; height: 60%; background: var(--neon-purple); }
+        .bar:nth-child(3) { animation-delay: 0.2s; height: 80%; }
+        .bar:nth-child(4) { animation-delay: 0.3s; height: 50%; background: var(--neon-purple); }
+        
+        @keyframes wave {
+            0%, 100% { height: 20%; }
+            50% { height: 100%; }
+        }
+
+        /* Gradient Text */
+        .gradient-text {
+            background: linear-gradient(to right, #00f3ff, #bc13fe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen relative">
+
+    <div id="login-screen" class="absolute inset-0 z-50 flex flex-col justify-end p-8 bg-[url('https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=2070')] bg-cover bg-center">
+        <div class="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent"></div>
+        
+        <div class="relative z-10 space-y-6 slide-up">
+            <h1 class="text-6xl font-bold tracking-tighter">FIX<br><span class="gradient-text">VERSE</span></h1>
+            <p class="text-gray-400 text-lg">The Universal Repair Engine.<br>Diagnose. Visualize. Repair.</p>
+            
+            <div class="space-y-4 pt-8">
+                <button onclick="app.login('google')" class="w-full glass-panel py-4 rounded-2xl flex items-center justify-center gap-3 hover:bg-white/10 transition active:scale-95">
+                    <i class="fab fa-google text-xl"></i> Continue with Google
+                </button>
+                <button onclick="app.login('apple')" class="w-full bg-white text-black py-4 rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-gray-200 transition active:scale-95">
+                    <i class="fab fa-apple text-xl"></i> Continue with Apple
+                </button>
+            </div>
+            <p class="text-center text-xs text-gray-500 pb-4">By continuing, you agree to our Terms & Zero-Waste Policy.</p>
+        </div>
+    </div>
+
+    <div id="app-interface" class="hidden absolute inset-0 flex flex-col">
+        
+        <header class="p-6 flex justify-between items-center glass-nav z-20">
+            <div class="font-bold text-xl tracking-wider">FIX<span class="text-cyan-400">VERSE</span></div>
+            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-cyan-500 to-purple-600 p-[2px]">
+                <img src="https://i.pravatar.cc/150?img=11" class="w-full h-full rounded-full border-2 border-black" alt="User">
+            </div>
+        </header>
+
+        <main id="main-container" class="flex-1 overflow-y-auto relative bg-black no-scrollbar pb-24">
+            
+            <section id="section-chat" class="min-h-full flex flex-col p-4 hidden fade-in">
+                <div class="flex-1 space-y-4 mb-20" id="chat-history">
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-cyan-900 flex items-center justify-center text-cyan-400 text-xs"><i class="fas fa-robot"></i></div>
+                        <div class="glass-panel p-4 rounded-2xl rounded-tl-none max-w-[80%] text-sm text-gray-200">
+                            Hello, Engineer. I am fully online. Upload a photo of a broken device, or describe the issue.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="absolute bottom-24 left-4 right-4 glass-panel p-2 rounded-full flex items-center gap-2">
+                    <button class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-cyan-400"><i class="fas fa-plus"></i></button>
+                    <input type="text" id="chat-input" placeholder="Ask about repairs..." class="flex-1 bg-transparent border-none outline-none text-white px-2">
+                    <button onclick="app.sendMessage()" class="w-10 h-10 rounded-full bg-cyan-500 text-black flex items-center justify-center"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </section>
+
+            <section id="section-library" class="p-6 space-y-6 hidden fade-in">
+                <h2 class="text-2xl font-bold">Component Library</h2>
+                
+                <div id="canvas-container">
+                    <div class="absolute top-4 left-4 z-10 bg-black/50 px-3 py-1 rounded-full text-xs font-mono text-cyan-400">LIVE PREVIEW</div>
+                    </div>
+                <p class="text-xs text-center text-gray-500">Interact to Rotate • Pinch to Zoom</p>
+
+                <div class="relative">
+                    <i class="fas fa-search absolute left-4 top-3.5 text-gray-500"></i>
+                    <input type="text" placeholder="Search 1,240 parts..." class="w-full glass-panel py-3 pl-12 pr-4 rounded-xl text-sm outline-none focus:border-cyan-500 transition">
+                </div>
+
+                <div class="flex gap-3 overflow-x-auto no-scrollbar pb-2">
+                    <button class="px-5 py-2 rounded-full bg-cyan-500/20 text-cyan-400 text-sm font-medium border border-cyan-500/50">All</button>
+                    <button class="px-5 py-2 rounded-full glass-panel text-gray-400 text-sm font-medium whitespace-nowrap">Engines</button>
+                    <button class="px-5 py-2 rounded-full glass-panel text-gray-400 text-sm font-medium whitespace-nowrap">Circuit Boards</button>
+                    <button class="px-5 py-2 rounded-full glass-panel text-gray-400 text-sm font-medium whitespace-nowrap">Plumbing</button>
+                </div>
+
+                <div id="library-grid" class="grid grid-cols-2 gap-4 pb-20">
+                    </div>
+            </section>
+
+            <section id="section-live" class="h-full relative hidden fade-in">
+                <video id="camera-feed" class="w-full h-full object-cover" autoplay playsinline muted></video>
+                
+                <div class="absolute inset-0 pointer-events-none">
+                    <div class="absolute top-1/4 left-8 right-8 bottom-1/4 border-2 border-cyan-500/50 rounded-3xl flex flex-col justify-between p-4">
+                        <div class="w-full flex justify-between">
+                            <div class="w-4 h-4 border-t-4 border-l-4 border-cyan-400"></div>
+                            <div class="w-4 h-4 border-t-4 border-r-4 border-cyan-400"></div>
+                        </div>
+                        <div class="text-center">
+                            <div class="bg-black/60 backdrop-blur-md px-4 py-2 rounded-full inline-block text-cyan-400 text-xs font-mono animate-pulse">
+                                <i class="fas fa-bolt mr-2"></i>ANALYZING CIRCUITRY
+                            </div>
+                        </div>
+                        <div class="w-full flex justify-between">
+                            <div class="w-4 h-4 border-b-4 border-l-4 border-cyan-400"></div>
+                            <div class="w-4 h-4 border-b-4 border-r-4 border-cyan-400"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="absolute bottom-24 left-0 right-0 p-6">
+                    <div class="glass-panel p-6 rounded-3xl flex flex-col items-center gap-4">
+                        <div class="voice-wave">
+                            <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                            <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                        </div>
+                        <p id="ai-status-text" class="text-center text-sm font-medium text-gray-200">"Explain the problem. I am listening..."</p>
+                        <div class="flex gap-4 w-full">
+                            <button class="flex-1 py-3 bg-red-500/20 text-red-400 rounded-xl font-bold border border-red-500/30">Stop</button>
+                            <button onclick="app.speakAdvice()" class="flex-1 py-3 bg-cyan-500 text-black rounded-xl font-bold hover:bg-cyan-400">Fix It</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+
+        <nav class="absolute bottom-0 w-full glass-nav pb-6 pt-4 px-8 flex justify-between items-end z-30">
+            <button onclick="app.switchTab('chat')" class="nav-btn text-gray-400 flex flex-col items-center gap-1 transition hover:text-cyan-400" data-target="chat">
+                <i class="fas fa-comment-alt text-xl"></i>
+                <span class="text-[10px] font-medium">Oracle</span>
+            </button>
+            
+            <button onclick="app.switchTab('live')" class="nav-btn mb-4 transform -translate-y-4" data-target="live">
+                <div class="w-16 h-16 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 shadow-[0_0_30px_rgba(6,182,212,0.6)] flex items-center justify-center border-4 border-black">
+                    <i class="fas fa-camera text-2xl text-white"></i>
+                </div>
+            </button>
+
+            <button onclick="app.switchTab('library')" class="nav-btn text-gray-400 flex flex-col items-center gap-1 transition hover:text-purple-400" data-target="library">
+                <i class="fas fa-cube text-xl"></i>
+                <span class="text-[10px] font-medium">Library</span>
+            </button>
+        </nav>
+
+    </div>
+
+    <script>
+        class FixVerseApp {
+            constructor() {
+                this.currentTab = 'chat';
+                this.objectsLoaded = false;
+            }
+
+            // 1. Auth Logic
+            login(provider) {
+                // Simulate Login Delay
+                const btn = event.currentTarget;
+                const originalText = btn.innerHTML;
+                btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Authenticating...`;
+                
+                setTimeout(() => {
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('app-interface').classList.remove('hidden');
+                    this.switchTab('library'); // Start on library for wow factor
+                }, 1500);
+            }
+
+            // 2. Navigation Logic
+            switchTab(tabId) {
+                // Update UI state
+                document.querySelectorAll('section').forEach(el => el.classList.add('hidden'));
+                document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('text-cyan-400', 'text-purple-400'));
+                
+                // Show Target
+                const target = document.getElementById(`section-${tabId}`);
+                target.classList.remove('hidden');
+                
+                // Specific Tab Logic
+                if (tabId === 'library') {
+                    if (!this.objectsLoaded) this.generateLibrary();
+                    this.init3DViewer();
+                }
+                if (tabId === 'live') {
+                    this.startCamera();
+                } else {
+                    this.stopCamera();
+                }
+
+                this.currentTab = tabId;
+            }
+
+            // 3. Section 2: Massive Library Generation
+            generateLibrary() {
+                const grid = document.getElementById('library-grid');
+                const categories = ['Engine', 'Circuit', 'Hydraulic', 'Gear', 'Optics'];
+                const images = [
+                    'https://images.unsplash.com/photo-1597423244036-ef5020e8d2da?auto=format&fit=crop&w=400&q=80', // Engine
+                    'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=80', // Chip
+                    'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=400&q=80', // Tech
+                ];
+
+                let html = '';
+                // Generating 1000 items as requested
+                for (let i = 1; i <= 1000; i++) {
+                    const cat = categories[Math.floor(Math.random() * categories.length)];
+                    const img = images[Math.floor(Math.random() * images.length)];
+                    const price = (Math.random() * 500).toFixed(2);
+                    
+                    html += `
+                        <div class="glass-panel rounded-2xl overflow-hidden hover:border-cyan-500/50 transition duration-300">
+                            <div class="h-32 bg-gray-800 relative">
+                                <img src="${img}" class="w-full h-full object-cover opacity-80">
+                                <div class="absolute top-2 right-2 bg-black/60 px-2 py-1 rounded text-[10px] font-bold">3D READY</div>
+                            </div>
+                            <div class="p-3">
+                                <h3 class="font-bold text-sm truncate">Part #${10000+i}: ${cat} Module</h3>
+                                <div class="flex justify-between items-center mt-2">
+                                    <span class="text-xs text-gray-400">$${price}</span>
+                                    <button class="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center text-cyan-400 text-xs">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                grid.innerHTML = html;
+                this.objectsLoaded = true;
+            }
+
+            // 4. Section 2: Three.js Integration (The 3D Cube)
+            init3DViewer() {
+                if (document.querySelector('canvas')) return; // Don't re-init
+
+                const container = document.getElementById('canvas-container');
+                const scene = new THREE.Scene();
+                
+                // Camera
+                const camera = new THREE.PerspectiveCamera(75, container.offsetWidth / container.offsetHeight, 0.1, 1000);
+                camera.position.z = 2.5;
+
+                // Renderer
+                const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+                renderer.setSize(container.offsetWidth, container.offsetHeight);
+                container.appendChild(renderer.domElement);
+
+                // Object (A Neon Wireframe Box)
+                const geometry = new THREE.IcosahedronGeometry(1, 1);
+                const material = new THREE.MeshBasicMaterial({ 
+                    color: 0x00f3ff, 
+                    wireframe: true,
+                    transparent: true, 
+                    opacity: 0.8 
+                });
+                const cube = new THREE.Mesh(geometry, material);
+                scene.add(cube);
+
+                // Animation Loop
+                function animate() {
+                    requestAnimationFrame(animate);
+                    cube.rotation.x += 0.005;
+                    cube.rotation.y += 0.005;
+                    renderer.render(scene, camera);
+                }
+                animate();
+
+                // Responsive Canvas
+                window.addEventListener('resize', () => {
+                    const width = container.offsetWidth;
+                    const height = container.offsetHeight;
+                    renderer.setSize(width, height);
+                    camera.aspect = width / height;
+                    camera.updateProjectionMatrix();
+                });
+            }
+
+            // 5. Section 3: Live Camera Logic
+            async startCamera() {
+                const video = document.getElementById('camera-feed');
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                        video.srcObject = stream;
+                    } catch (err) {
+                        console.error("Camera denied", err);
+                        alert("Please allow camera access for Repair AI.");
+                    }
+                }
+            }
+
+            stopCamera() {
+                const video = document.getElementById('camera-feed');
+                if (video.srcObject) {
+                    const tracks = video.srcObject.getTracks();
+                    tracks.forEach(track => track.stop());
+                    video.srcObject = null;
+                }
+            }
+
+            // 6. AI Logic (Simulated)
+            sendMessage() {
+                const input = document.getElementById('chat-input');
+                const history = document.getElementById('chat-history');
+                const text = input.value;
+                if (!text) return;
+
+                // User Msg
+                history.innerHTML += `
+                    <div class="flex gap-3 flex-row-reverse fade-in">
+                        <div class="glass-panel bg-cyan-500/20 border-cyan-500/50 p-4 rounded-2xl rounded-tr-none max-w-[80%] text-sm text-white">
+                            ${text}
+                        </div>
+                    </div>`;
+                
+                input.value = '';
+                history.scrollTop = history.scrollHeight;
+
+                // Simulated AI Response
+                setTimeout(() => {
+                    history.innerHTML += `
+                    <div class="flex gap-3 fade-in">
+                        <div class="w-8 h-8 rounded-full bg-cyan-900 flex items-center justify-center text-cyan-400 text-xs"><i class="fas fa-robot"></i></div>
+                        <div class="glass-panel p-4 rounded-2xl rounded-tl-none max-w-[80%] text-sm text-gray-200">
+                            Based on your description, this sounds like a capacitor failure. <br><br>
+                            <strong>Action Plan:</strong><br>
+                            1. Power off the device.<br>
+                            2. Check the C41 component on the board.<br>
+                            Would you like to see a 3D model of that part?
+                        </div>
+                    </div>`;
+                    history.scrollTop = history.scrollHeight;
+                }, 1500);
+            }
+
+            speakAdvice() {
+                const status = document.getElementById('ai-status-text');
+                status.innerText = "Analyzing visual data...";
+                status.className = "text-cyan-400 animate-pulse text-center font-bold";
+                
+                // Simulate speech
+                if ('speechSynthesis' in window) {
+                    setTimeout(() => {
+                        const utterance = new SpeechSynthesisUtterance("I have detected a fractured hinge. Please apply lubricant and tighten the left screw.");
+                        utterance.pitch = 0.9;
+                        utterance.rate = 1.1;
+                        window.speechSynthesis.speak(utterance);
+                        status.innerText = "Guide Sent to Chat.";
+                    }, 2000);
+                }
+            }
+        }
+
+        // Initialize
+        const app = new FixVerseApp();
+    </script>
+</body>
+</html>
